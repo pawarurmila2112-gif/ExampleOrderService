@@ -14,5 +14,9 @@ namespace ExampleOrderService.Models
         public decimal Price { get; set; }
 
         public DateTime OrderDate { get; set; }
+
+        // Add this for EF Core optimistic concurrency handling
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
     }
 }
