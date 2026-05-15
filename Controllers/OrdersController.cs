@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ExampleOrderService.Models;
 using ExampleOrderService.Repositories;
@@ -10,6 +11,7 @@ namespace ExampleOrderService.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize] // require authentication for all endpoints in this controller
     public class OrdersController : ControllerBase
     {
         private readonly IOrderRepository _repository;
@@ -17,7 +19,7 @@ namespace ExampleOrderService.Controllers
         public OrdersController(IOrderRepository repository) =>
             _repository = repository;
 
-        // GET: api/orders  
+        // GET: api/orders
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Order>>> GetOrders(CancellationToken cancellationToken = default)
         {
