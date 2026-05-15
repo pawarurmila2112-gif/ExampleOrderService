@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,7 @@ using Xunit;
 using ExampleOrderService.Controllers;
 using ExampleOrderService.Data;
 using ExampleOrderService.Models;
+using ExampleOrderService.Repositories;
 
 namespace ExampleOrderService.Tests
 {
@@ -33,7 +35,8 @@ namespace ExampleOrderService.Tests
             });
             await context.SaveChangesAsync();
 
-            var controller = new OrdersController(context);
+            var repo = new OrderRepository(context);
+            var controller = new OrdersController(repo);
 
             var actionResult = await controller.GetOrders();
             var ok = Assert.IsType<OkObjectResult>(actionResult.Result);
@@ -46,7 +49,8 @@ namespace ExampleOrderService.Tests
         {
             var dbName = Guid.NewGuid().ToString();
             await using var context = CreateContext(dbName);
-            var controller = new OrdersController(context);
+            var repo = new OrderRepository(context);
+            var controller = new OrdersController(repo);
 
             var result = await controller.GetOrder(12345);
             Assert.IsType<NotFoundResult>(result.Result);
@@ -57,7 +61,8 @@ namespace ExampleOrderService.Tests
         {
             var dbName = Guid.NewGuid().ToString();
             await using var context = CreateContext(dbName);
-            var controller = new OrdersController(context);
+            var repo = new OrderRepository(context);
+            var controller = new OrdersController(repo);
 
             var order = new Order
             {
@@ -93,7 +98,8 @@ namespace ExampleOrderService.Tests
             context.Orders.Add(initial);
             await context.SaveChangesAsync();
 
-            var controller = new OrdersController(context);
+                var repo = new OrderRepository(context);
+            var controller = new OrdersController(repo);
 
             var updated = new Order
             {
@@ -127,7 +133,8 @@ namespace ExampleOrderService.Tests
             context.Orders.Add(order);
             await context.SaveChangesAsync();
 
-            var controller = new OrdersController(context);
+            var repo = new OrderRepository(context);
+            var controller = new OrdersController(repo);
 
             var result = await controller.DeleteOrder(order.Id);
             Assert.IsType<NoContentResult>(result);

@@ -1,8 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-
-using ExampleOrderService.Data;
 using ExampleOrderService.Models;
+using ExampleOrderService.Repositories;
 
 namespace ExampleOrderService.Controllers
 {
@@ -10,20 +12,16 @@ namespace ExampleOrderService.Controllers
     [Route("api/[controller]")]
     public class OrdersController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IOrderRepository _repository;
 
-        public OrdersController(ApplicationDbContext context) =>
-            _context = context;
+        public OrdersController(IOrderRepository repository) =>
+            _repository = repository;
 
-        // GET: api/orders
+        // GET: api/orders  
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Order>>> GetOrders(CancellationToken cancellationToken = default)
         {
-            var orders = await _context.Orders
-                .AsNoTracking()
-                .OrderByDescending(o => o.OrderDate)
-                .ToListAsync(cancellationToken);
-
+            var orders = await _repository.GetAllAsync(cancellationToken);
             return Ok(orders);
         }
 
@@ -31,9 +29,7 @@ namespace ExampleOrderService.Controllers
         [HttpGet("{id:int}", Name = nameof(GetOrder))]
         public async Task<ActionResult<Order>> GetOrder(int id, CancellationToken cancellationToken = default)
         {
-            var order = await _context.Orders
-                .AsNoTracking()
-                .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+            var order = await _repository.GetByIdAsync(id, cancellationToken);
 
             if (order is null)
                 return NotFound();
@@ -48,17 +44,8 @@ namespace ExampleOrderService.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            // Ignore client-supplied Id/RowVersion for creation
-            order.Id = 0;
-            order.RowVersion = null;
-
-            if (order.OrderDate == default)
-                order.OrderDate = DateTime.UtcNow;
-
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
+            var created = await _repository.CreateAsync(order, cancellationToken);
+            return CreatedAtAction(nameof(GetOrder), new { id = created.Id }, created);
         }
 
         // PUT: api/orders/{id}
@@ -71,56 +58,27 @@ namespace ExampleOrderService.Controllers
             if (id != updatedOrder.Id)
                 return BadRequest("Route id and body id do not match.");
 
-            var existing = await _context.Orders.FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
-            if (existing is null)
-                return NotFound();
-
-            // Prepare concurrency: set the original RowVersion to the value supplied by the client
-            if (updatedOrder.RowVersion is not null)
+            var result = await _repository.UpdateAsync(updatedOrder, updatedOrder.RowVersion, cancellationToken);
+            return result switch
             {
-                _context.Entry(existing).Property(e => e.RowVersion).OriginalValue = updatedOrder.RowVersion;
-            }
-
-            // Map allowed updatable fields
-            existing.ProductName = updatedOrder.ProductName;
-            existing.Quantity = updatedOrder.Quantity;
-            existing.Price = updatedOrder.Price;
-            existing.OrderDate = updatedOrder.OrderDate;
-
-            try
-            {
-                await _context.SaveChangesAsync(cancellationToken);
-                return NoContent();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                // If the entity was deleted concurrently, return 404.
-                if (!await _context.Orders.AnyAsync(e => e.Id == id, cancellationToken))
-                    return NotFound();
-
-                // Otherwise it's a concurrency conflict — return 409 Conflict with current store values
-                var storeValues = await _context.Orders
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
-
-                return Conflict(new
+                UpdateResult.Success => NoContent(),
+                UpdateResult.NotFound => NotFound(),
+                UpdateResult.Conflict => (IActionResult)Conflict(new
                 {
                     Message = "Concurrency conflict: the order was modified by another actor.",
-                    Current = storeValues
-                });
-            }
+                    Current = await _repository.GetByIdAsync(id, cancellationToken)
+                }),
+                _ => StatusCode(500)
+            };
         }
 
         // DELETE: api/orders/{id}
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> DeleteOrder(int id, CancellationToken cancellationToken = default)
         {
-            var existing = await _context.Orders.FindAsync(new object[] { id }, cancellationToken);
-            if (existing is null)
+            var deleted = await _repository.DeleteAsync(id, cancellationToken);
+            if (!deleted)
                 return NotFound();
-
-            _context.Orders.Remove(existing);
-            await _context.SaveChangesAsync(cancellationToken);
 
             return NoContent();
         }
