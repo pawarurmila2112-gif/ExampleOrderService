@@ -16,10 +16,15 @@ pipeline {
             }
         }
 
+        stage('Remove Old Random Containers') {
+            steps {
+                sh 'docker ps -aq --filter "ancestor=orderservice" | xargs -r docker rm -f || true'
+            }
+        }
+
         stage('Run Docker Container') {
             steps {
-                
-                 sh 'docker run -d --name orderservice-container -p 8085:8080 orderservice'
+                sh 'docker run -d --name orderservice-container -p 8085:8080 orderservice'
             }
         }
     }
