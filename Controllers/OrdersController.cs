@@ -11,7 +11,7 @@ namespace ExampleOrderService.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    //[Authorize] // require authentication for all endpoints in this controller
+    [Authorize] // require authentication for all endpoints in this controller
     public class OrdersController : ControllerBase
     {
         private readonly IOrderRepository _repository;
