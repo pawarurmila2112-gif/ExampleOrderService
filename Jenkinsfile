@@ -9,6 +9,13 @@ pipeline {
             }
         }
 
+        stage('Stop Old Container') {
+            steps {
+                sh 'docker stop orderservice-container || true'
+                sh 'docker rm orderservice-container || true'
+            }
+        }
+
         stage('Run Docker Container') {
             steps {
                 sh 'docker run -d -p 8085:8080 orderservice'
