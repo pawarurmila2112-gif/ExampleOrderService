@@ -18,7 +18,8 @@ pipeline {
 
         stage('Run Docker Container') {
             steps {
-                sh 'docker run -d -p 8085:8080 orderservice'
+                
+                 sh 'docker run -d --name orderservice-container -p 8085:8080 orderservice'
             }
         }
     }
